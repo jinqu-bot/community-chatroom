@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社区聊天室</title>
+    <style>
+        :root {
+            --pink: #F4A6A0; --pink-light: #FAD4CF; --mint: #A8E6CF; --mint-dark: #7DD3AE;
+            --cream: #FFE8D0; --yellow: #FFF5BA; --purple: #C9B8D8; --dark: #2D2D2D;
+            --border: 2px solid #2D2D2D; --shadow: 4px 4px 0px #2D2D2D;
+            --shadow-hover: 6px 6px 0px #2D2D2D; --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--pink-light); min-height: 100vh; color: var(--dark); overflow-x: hidden;
+        }
+        body::before { content:''; position:fixed; top:10%; right:5%; width:120px; height:120px; background:var(--cream); border:var(--border); border-radius:50%; z-index:0; animation:float 6s ease-in-out infinite; }
+        body::after { content:''; position:fixed; bottom:15%; left:3%; width:80px; height:80px; background:var(--purple); border:var(--border); border-radius:50%; transform:rotate(45deg); z-index:0; animation:float 8s ease-in-out infinite reverse; }
+        @keyframes float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-20px) rotate(5deg)} }
+
+        /* ===== 登录页 ===== */
+        .auth-layer { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:1000; background:linear-gradient(135deg,var(--pink)0%,var(--pink-light)50%,#FDECE8 100%); }
+        .auth-wrapper { position:relative; width:100%; max-width:900px; min-height:520px; display:flex; align-items:stretch; background:#fff; border:var(--border); box-shadow:8px 8px 0 rgba(45,45,45,0.2); overflow:hidden; }
+        .auth-brand { flex:1; background:var(--pink); padding:48px 40px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; position:relative; overflow:hidden; }
+        .auth-brand::before { content:''; position:absolute; top:30px; left:30px; width:60px; height:60px; background:var(--cream); border:var(--border); border-radius:50%; }
+        .auth-brand::after { content:''; position:absolute; bottom:40px; right:25px; width:70px; height:70px; background:var(--purple); border:var(--border); transform:rotate(45deg); }
+        .brand-logo { font-size:56px; margin-bottom:16px; z-index:1; filter:drop-shadow(3px 3px 0 rgba(45,45,45,0.2)); }
+        .brand-title { font-size:32px; font-weight:800; margin-bottom:8px; letter-spacing:2px; z-index:1; }
+        .brand-slogan { font-size:14px; opacity:0.75; line-height:1.8; max-width:240px; z-index:1; }
+        .brand-tagline { margin-top:24px; font-size:13px; opacity:0.6; letter-spacing:3px; z-index:1; }
+        .auth-form-area { flex:1; padding:48px 44px; display:flex; flex-direction:column; justify-content:center; }
+        .auth-tabs { display:flex; gap:12px; margin-bottom:28px; }
+        .auth-tab { flex:1; text-align:center; padding:14px; background:#fff; border:var(--border); cursor:pointer; font-size:16px; font-weight:700; transition:all 0.2s; }
+        .auth-tab:hover { transform:translate(-2px,-2px); box-shadow:var(--shadow); }
+        .auth-tab.active { background:var(--mint); box-shadow:var(--shadow); transform:translate(-2px,-2px); }
+        .auth-error { color:#e74c3c; font-size:13px; text-align:center; margin-bottom:16px; padding:10px 16px; background:#FFF0EF; border:2px solid #e74c3c; border-radius:var(--radius); display:none; font-weight:600; }
+        .auth-box input { width:100%; padding:14px 18px; border:var(--border); border-radius:var(--radius); margin-bottom:14px; font-size:15px; outline:none; background:#FAFAFA; transition:all 0.2s; font-family:inherit; }
+        .auth-box input:focus { background:#fff; box-shadow:3px 3px 0 rgba(168,230,207,0.6); border-color:var(--mint-dark); }
+        .auth-btn-primary { width:100%; padding:15px; background:var(--mint); color:var(--dark); border:var(--border); font-size:17px; font-weight:800; cursor:pointer; transition:all 0.2s; letter-spacing:2px; }
+        .auth-btn-primary:hover { transform:translate(-3px,-3px); box-shadow:var(--shadow-hover); background:var(--mint-dark); }
+        .auth-btn-primary:active { transform:translate(0,0); box-shadow:none; }
+        @media (max-width:640px) { .auth-brand { display:none; } .auth-wrapper { max-width:400px; min-height:auto; } .auth-form-area { padding:36px 28px; } }
+
+        /* ===== 主容器 ===== */
+        .app-shell { display:none; height:100vh; position:relative; z-index:1; flex-direction:row; animation:slideUp 0.5s ease; }
+        .app-shell.show { display:flex; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+
+        /* ===== 左侧导航栏 ===== */
+        .nav-sidebar { width:64px; background:#fff; border-right:var(--border); display:flex; flex-direction:column; align-items:center; padding:12px 0; gap:6px; flex-shrink:0; z-index:10; }
+        .nav-item { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border:2px solid transparent; border-radius:12px; cursor:pointer; font-size:20px; transition:all 0.2s; position:relative; }
+        .nav-item:hover { background:var(--cream); border-color:var(--dark); }
+        .nav-item.active { background:var(--mint); border-color:var(--dark); }
+        .nav-badge { position:absolute; top:2px; right:2px; min-width:18px; height:18px; background:#e74c3c; color:#fff; border-radius:10px; font-size:10px; font-weight:700; display:none; align-items:center; justify-content:center; padding:0 4px; }
+        .nav-badge.show { display:flex; }
+        .nav-spacer { flex:1; }
+
+        /* ===== 主内容区 ===== */
+        .main-content { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#fff; border-top:var(--border); border-right:var(--border); border-bottom:var(--border); }
+        .panel { display:none; flex-direction:column; flex:1; overflow:hidden; }
+        .panel.active { display:flex; }
+
+        /* ===== 聊天面板 ===== */
+        .chat-header { padding:12px 20px; background:#fff; border-bottom:2px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+        .header-left { display:flex; align-items:center; gap:10px; }
+        .header-title { font-size:18px; font-weight:800; letter-spacing:1px; }
+        .header-right { display:flex; align-items:center; gap:8px; }
+        .online-badge { padding:5px 12px; background:var(--pink-light); border:var(--border); border-radius:20px; font-size:12px; font-weight:700; }
+        .btn-sm { padding:6px 12px; border:var(--border); border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; background:#fff; transition:all 0.15s; }
+        .btn-sm:hover { transform:translate(-1px,-1px); box-shadow:2px 2px 0 var(--dark); }
+        .user-avatar-sm { width:34px; height:34px; border:var(--border); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; background:var(--purple); cursor:pointer; }
+        .channel-bar { display:flex; gap:8px; align-items:center; padding:6px 16px; background:#fff; border-bottom:2px solid #eee; }
+        .channel-bar select { flex:1; padding:6px 10px; border:var(--border); border-radius:8px; font-size:13px; font-weight:700; outline:none; background:#fff; max-width:200px; }
+        .chat-body { flex:1; padding:20px; overflow-y:auto; }
+        .chat-body::-webkit-scrollbar { width:8px; } .chat-body::-webkit-scrollbar-track { background:transparent; }
+        .chat-body::-webkit-scrollbar-thumb { background:var(--pink-light); border-radius:4px; }
+        .reply-bar { display:flex; align-items:center; gap:8px; padding:6px 16px; background:#FFF5BA; border-top:2px solid #E8D44D; }
+        .reply-quote { font-size:11px; color:#888; padding:4px 12px; border-left:3px solid var(--mint); margin-bottom:4px; cursor:pointer; transition:background 0.15s; }
+        .reply-quote:hover { background:#F5F5F5; }
+        .reply-btn { display:none; position:absolute; right:4px; top:50%; transform:translateY(-50%); padding:2px 6px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:11px; }
+        .user-bubble:hover .reply-btn { display:inline-block; }
+        .user-bubble { position:relative; display:inline-block; padding:10px 16px; word-break:break-all; line-height:1.6; font-size:14px; position:relative; border:var(--border); box-shadow:3px 3px 0 rgba(45,45,45,0.08); max-width:80%; }
+        .msg { margin-bottom:16px; animation:msgIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes msgIn { from{opacity:0;transform:translateY(15px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }
+        .system-msg { text-align:center; color:#888; font-size:12px; margin:12px auto; padding:6px 16px; background:#F5F5F5; border:2px dashed #DDD; border-radius:20px; display:inline-block; position:relative; left:50%; transform:translateX(-50%); }
+        .user-item { display:flex; flex-direction:column; max-width:85%; }
+        .user-item.mine { align-self:flex-end; align-items:flex-end; }
+        .user-item.other { align-self:flex-start; align-items:flex-start; }
+        .user-name { font-size:11px; font-weight:700; color:#999; margin-bottom:4px; padding:0 12px; letter-spacing:0.5px; }
+        .user-item.mine .user-bubble { background:var(--mint); border-radius:14px 14px 6px 14px; }
+        .user-item.other .user-bubble { background:var(--yellow); border-radius:14px 14px 14px 6px; }
+        .msg-image { max-width:250px; max-height:180px; border-radius:8px; cursor:pointer; transition:all 0.2s; object-fit:cover; border:2px solid var(--dark); }
+        .msg-image:hover { transform:scale(1.03); box-shadow:4px 4px 0 var(--dark); }
+        .msg-file { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--cream); border:var(--border); border-radius:var(--radius); text-decoration:none; color:var(--dark); transition:all 0.2s; min-width:180px; }
+        .msg-file:hover { transform:translateX(4px); box-shadow:3px 3px 0 var(--dark); }
+        .file-icon { font-size:22px; width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:var(--purple); border:2px solid var(--dark); border-radius:8px; }
+        .file-info { display:flex; flex-direction:column; flex:1; }
+        .file-name { font-size:13px; font-weight:700; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-footer { padding:14px 20px; background:#fff; border-top:var(--border); }
+        .toolbar { display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+        .tool-btn { width:38px; height:38px; border:var(--border); background:#fff; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; transition:all 0.15s; border-radius:8px; }
+        .tool-btn:hover { background:var(--yellow); transform:translate(-1px,-1px); box-shadow:2px 2px 0 var(--dark); }
+        .input-row { display:flex; gap:10px; }
+        #msgInput { flex:1; padding:12px 18px; border:var(--border); border-radius:var(--radius); font-size:14px; outline:none; background:#FAFAFA; font-family:inherit; }
+        #msgInput:focus { background:#fff; box-shadow:3px 3px 0 rgba(168,230,207,0.5); }
+        #sendBtn { padding:0 24px; background:var(--pink); color:var(--dark); border:var(--border); font-size:14px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:1px; border-radius:var(--radius); }
+        #sendBtn:hover:not(:disabled) { transform:translate(-2px,-2px); box-shadow:var(--shadow); }
+        #sendBtn:disabled { opacity:0.4; cursor:not-allowed; }
+        .emoji-picker { position:absolute; bottom:70px; left:20px; background:#fff; border:var(--border); border-radius:12px; padding:12px; box-shadow:var(--shadow-hover); display:none; z-index:100; }
+        .emoji-picker.show { display:block; animation:popIn 0.2s ease; }
+        @keyframes popIn { from{opacity:0;transform:scale(0.85) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
+        .emoji-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; }
+        .emoji-item { width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:20px; border-radius:6px; transition:all 0.15s; }
+        .emoji-item:hover { background:var(--pink-light); transform:scale(1.25); }
+        .upload-preview { display:none; align-items:center; gap:10px; margin-bottom:10px; padding:10px 14px; background:var(--cream); border:var(--border); border-radius:var(--radius); }
+        .upload-preview.show { display:flex; }
+        .upload-preview img { width:44px; height:44px; object-fit:cover; border:2px solid var(--dark); border-radius:6px; }
+        .upload-info { flex:1; } .upload-name { font-size:13px; font-weight:700; } .upload-size { font-size:11px; color:#888; }
+
+        /* ===== 好友面板 ===== */
+        .friend-panel { display:flex; flex-direction:column; height:100%; }
+        .friend-header { padding:12px 20px; border-bottom:var(--border); display:flex; gap:8px; align-items:center; background:#fff; }
+        .friend-header input { flex:1; padding:8px 14px; border:var(--border); border-radius:8px; font-size:13px; outline:none; }
+        .friend-header input:focus { border-color:var(--mint); }
+        .friend-tabs { display:flex; padding:0 20px; border-bottom:var(--border); background:#fafafa; }
+        .friend-tab { padding:8px 16px; cursor:pointer; font-size:13px; font-weight:700; border-bottom:3px solid transparent; transition:all 0.15s; }
+        .friend-tab:hover { background:#fff; }
+        .friend-tab.active { border-bottom-color:var(--mint); background:#fff; }
+        .friend-list { flex:1; overflow-y:auto; padding:0; }
+        .friend-item { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid #f0f0f0; cursor:pointer; transition:background 0.15s; }
+        .friend-item:hover { background:#f8f8f8; }
+        .friend-avatar { width:42px; height:42px; border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#fff; flex-shrink:0; border:2px solid var(--dark); position:relative; }
+        .friend-avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+        .online-dot { position:absolute; bottom:0; right:0; width:10px; height:10px; background:#5cd859; border:2px solid #fff; border-radius:50%; }
+        .offline-dot { background:#bbb; }
+        .friend-info { flex:1; min-width:0; }
+        .friend-name { font-weight:700; font-size:14px; }
+        .friend-status { font-size:11px; color:#888; }
+        .friend-actions { display:flex; gap:4px; }
+        .friend-actions button { padding:4px 10px; border:var(--border); border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; background:#fff; }
+        .friend-actions button:hover { background:var(--mint); }
+        .friend-actions button.danger:hover { background:var(--pink); }
+        .request-item { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid #f0f0f0; }
+        .request-actions { display:flex; gap:4px; margin-left:auto; }
+        .request-actions button { padding:5px 12px; border:var(--border); border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; }
+        .btn-accept { background:var(--mint)!important; } .btn-reject { background:var(--pink-light)!important; }
+
+        /* ===== 社区面板 ===== */
+        .community-header { padding:12px 20px; border-bottom:var(--border); display:flex; justify-content:space-between; align-items:center; background:#fff; }
+        .community-header h3 { font-size:16px; font-weight:800; }
+        .community-list { flex:1; overflow-y:auto; padding:12px 20px; }
+        .post-card { border:var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; background:#fff; transition:all 0.15s; cursor:pointer; }
+        .post-card:hover { box-shadow:var(--shadow); transform:translate(-2px,-2px); }
+        .post-title { font-size:16px; font-weight:800; margin-bottom:6px; }
+        .post-meta { display:flex; gap:12px; font-size:11px; color:#888; margin-bottom:8px; flex-wrap:wrap; }
+        .post-content { font-size:13px; line-height:1.6; color:#555; max-height:60px; overflow:hidden; }
+        .post-stats { display:flex; gap:16px; margin-top:10px; font-size:12px; font-weight:600; align-items:center; }
+        .post-stats span { display:flex; align-items:center; gap:4px; cursor:pointer; padding:4px 8px; border-radius:6px; transition:all 0.15s; }
+        .post-stats span:hover { background:#f0f0f0; }
+        .post-stats .liked { color:#e74c3c; }
+
+        /* ===== 帖子详情弹窗 ===== */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:999; align-items:center; justify-content:center; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:#fff; border:var(--border); border-radius:16px; box-shadow:var(--shadow-hover); width:90%; max-width:560px; max-height:80vh; display:flex; flex-direction:column; }
+        .modal-header { padding:14px 20px; border-bottom:var(--border); display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:15px; }
+        .modal-close { width:30px; height:30px; border:var(--border); border-radius:50%; cursor:pointer; font-size:16px; background:#fff; display:flex; align-items:center; justify-content:center; }
+        .modal-close:hover { background:var(--pink-light); }
+        .modal-body { padding:16px 20px; overflow-y:auto; flex:1; }
+        .modal-body .post-full-content { font-size:14px; line-height:1.8; margin-bottom:16px; white-space:pre-wrap; }
+        .comment-item { padding:10px 0; border-bottom:1px solid #f0f0f0; }
+        .comment-author { font-weight:700; font-size:13px; }
+        .comment-time { font-size:11px; color:#888; }
+        .comment-content { font-size:13px; margin-top:2px; }
+        .modal-footer { padding:12px 20px; border-top:var(--border); display:flex; gap:8px; }
+        .modal-footer input { flex:1; padding:8px 14px; border:var(--border); border-radius:8px; outline:none; font-size:13px; }
+
+        /* ===== 设置面板 ===== */
+        .settings-panel { display:flex; flex-direction:column; padding:24px; overflow-y:auto; }
+        .settings-panel h3 { font-size:18px; font-weight:800; margin-bottom:20px; }
+        .settings-group { margin-bottom:20px; }
+        .settings-group label { display:block; font-weight:700; font-size:13px; margin-bottom:6px; }
+        .avatar-upload-area { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+        .avatar-preview-large { width:72px; height:72px; border:var(--border); border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700; color:#fff; overflow:hidden; }
+        .avatar-preview-large img { width:100%; height:100%; object-fit:cover; }
+
+        /* ===== 私聊弹窗 ===== */
+        .private-chat-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:900; align-items:center; justify-content:center; }
+        .private-chat-overlay.show { display:flex; }
+        .private-chat-box { display:flex; flex-direction:column; width:90%; max-width:500px; max-height:70vh; background:#fff; border:var(--border); border-radius:16px; box-shadow:var(--shadow-hover); overflow:hidden; }
+        .private-chat-header { padding:12px 18px; border-bottom:var(--border); display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:14px; }
+        .private-chat-body { flex:1; overflow-y:auto; padding:14px; min-height:250px; max-height:400px; }
+        .private-msg { margin-bottom:10px; display:flex; flex-direction:column; }
+        .private-msg.mine { align-items:flex-end; }
+        .private-msg .bubble { display:inline-block; padding:8px 14px; border-radius:12px; max-width:75%; word-break:break-all; font-size:13px; border:var(--border); }
+        .private-msg.mine .bubble { background:var(--mint); border-radius:12px 12px 4px 12px; }
+        .private-msg.other .bubble { background:var(--yellow); border-radius:12px 12px 12px 4px; }
+        .private-msg .meta { font-size:10px; color:#888; margin-bottom:2px; padding:0 4px; }
+        .private-chat-input { display:flex; padding:10px 14px; border-top:var(--border); gap:8px; }
+        .private-chat-input input { flex:1; padding:8px 14px; border:var(--border); border-radius:8px; outline:none; font-size:13px; }
+        .private-chat-input button { padding:6px 16px; background:var(--mint); color:var(--dark); border:var(--border); border-radius:8px; font-weight:700; cursor:pointer; }
+
+        /* ===== 私聊列表面板 ===== */
+        .chat-list-panel { display:none; flex-direction:column; position:absolute; right:0; top:0; bottom:0; width:280px; background:#fff; border-left:var(--border); z-index:50; overflow:hidden; }
+        .chat-list-panel.show { display:flex; }
+        .chat-list-header { padding:12px 16px; border-bottom:var(--border); font-weight:700; font-size:14px; display:flex; justify-content:space-between; background:#fafafa; }
+        .chat-list-body { flex:1; overflow-y:auto; }
+        .chat-list-item { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid #f0f0f0; cursor:pointer; transition:background 0.15s; }
+        .chat-list-item:hover { background:#f8f8f8; }
+        .chat-list-item .unread-count { background:#e74c3c; color:#fff; border-radius:10px; padding:2px 7px; font-size:10px; font-weight:700; }
+        .chat-list-avatar { width:38px; height:38px; border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; flex-shrink:0; border:2px solid var(--dark); }
+        .chat-list-info { flex:1; min-width:0; }
+        .chat-list-name { font-weight:700; font-size:13px; }
+        .chat-list-msg { font-size:11px; color:#888; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+        /* ===== Toast ===== */
+        .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 22px; border-radius:10px; font-weight:700; font-size:13px; z-index:2000; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+        .toast.show { opacity:1; }
+        .loading { text-align:center; padding:20px; color:#888; font-weight:600; font-size:13px; }
+        .image-preview { position:fixed; inset:0; background:rgba(45,45,45,0.92); display:none; align-items:center; justify-content:center; z-index:2000; padding:40px; }
+        .image-preview.show { display:flex; } .image-preview img { max-width:90%; max-height:90%; border:3px solid #fff; box-shadow:8px 8px 0 rgba(255,255,255,0.2); }
+        .preview-close { position:absolute; top:20px; right:30px; font-size:40px; color:#fff; cursor:pointer; width:50px; height:50px; display:flex; align-items:center; justify-content:center; border:3px solid #fff; border-radius:50%; transition:all 0.2s; }
+        .preview-close:hover { transform:rotate(90deg) scale(1.1); }
+
+        @media (max-width:768px) {
+            .nav-sidebar { width:48px; } .nav-item { width:38px; height:38px; font-size:16px; }
+            .chat-list-panel { width:100%; } .private-chat-box { max-width:95%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录 -->
+    <div class="auth-layer" id="authLayer">
+        <div class="auth-wrapper">
+            <div class="auth-brand">
+                <div class="brand-logo">🐠</div><div class="brand-title">社区聊天室</div>
+                <div class="brand-slogan">每一次相遇都是缘分<br>与陌生人分享真心话</div>
+                <div class="brand-tagline">匿名 · 温暖 · 真实</div>
+            </div>
+            <div class="auth-form-area auth-box">
+                <div class="auth-tabs">
+                    <div class="auth-tab active" data-tab="login">登录</div>
+                    <div class="auth-tab" data-tab="register">注册</div>
+                </div>
+                <div class="auth-error" id="authError"></div>
+                <div id="loginForm">
+                    <input type="text" id="loginUsername" placeholder="用户名" autocomplete="username">
+                    <input type="password" id="loginPassword" placeholder="密码" autocomplete="current-password">
+                    <button class="auth-btn-primary" onclick="doLogin()">登 录</button>
+                </div>
+                <div id="registerForm" style="display:none;">
+                    <input type="text" id="regUsername" placeholder="用户名（3-20位）" autocomplete="username">
+                    <input type="text" id="regNickname" placeholder="昵称（选填）">
+                    <input type="password" id="regPassword" placeholder="密码（至少6位）" autocomplete="new-password">
+                    <button class="auth-btn-primary" onclick="doRegister()">注 册</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片预览 -->
+    <div class="image-preview" id="imagePreview">
+        <span class="preview-close" onclick="closeImagePreview()">&times;</span>
+        <img id="previewImg" src="" alt="预览">
+    </div>
+
+    <!-- 主应用 -->
+    <div class="app-shell" id="appShell">
+        <!-- 左侧导航 -->
+        <div class="nav-sidebar" id="navSidebar">
+            <div class="nav-item active" data-panel="chat" onclick="switchPanel('chat')" title="聊天">💬</div>
+            <div class="nav-item" data-panel="friends" onclick="switchPanel('friends')" title="好友">
+                👥<span class="nav-badge" id="friendBadge">0</span>
+            </div>
+            <div class="nav-item" data-panel="community" onclick="switchPanel('community')" title="社区">📝</div>
+            <div class="nav-spacer"></div>
+            <div class="nav-item" onclick="toggleChatList()" title="私聊列表">✉️</div>
+            <div class="nav-item" data-panel="settings" onclick="switchPanel('settings')" title="设置">⚙️</div>
+            <a href="/games" class="nav-item" title="游戏大厅" style="text-decoration:none;">🎮</a>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- ===== 聊天面板 ===== -->
+            <div class="panel active" id="panel-chat">
+                <div class="chat-header">
+                    <div class="header-left"><div class="header-title">💬 社区聊天室</div></div>
+                    <div class="header-right">
+                        <span class="online-badge" id="onlineNum">👥 在线：0</span>
+                        <button class="btn-sm" onclick="requestNotification()">🔔</button>
+                        <button class="btn-sm" onclick="loadHistory()">📜</button>
+                        <div class="user-avatar-sm" id="userAvatar" title="" onclick="switchPanel('settings')" style="cursor:pointer;"></div>
+                        <button class="btn-sm" onclick="logout()" style="background:var(--pink-light);">退出</button>
+                    </div>
+                </div>
+                <div class="channel-bar">
+                    <select id="channelSelect" onchange="switchChannel()"></select>
+                    <button class="btn-sm" onclick="createChannel()">➕</button>
+                    <button class="btn-sm" onclick="deleteChannel()">🗑</button>
+                </div>
+                <div class="chat-body" id="chatBody"></div>
+                <div class="reply-bar" id="replyBar" style="display:none;">
+                    <span id="replyText" style="flex:1;font-size:13px;color:#555;"></span>
+                    <button onclick="cancelReply()" style="padding:2px 8px;border:var(--border);border-radius:4px;background:var(--pink-light);cursor:pointer;font-weight:700;">×</button>
+                </div>
+                <div class="chat-footer" style="position:relative;">
+                    <div class="emoji-picker" id="emojiPicker"><div class="emoji-grid" id="emojiGrid"></div></div>
+                    <div class="upload-preview" id="uploadPreview">
+                        <img id="previewThumb" src="" alt="" style="display:none;">
+                        <span id="previewFileIcon" class="file-icon" style="display:none;">📄</span>
+                        <div class="upload-info"><div class="upload-name" id="uploadName"></div><div class="upload-size" id="uploadSize"></div></div>
+                        <button class="btn-sm" onclick="cancelUpload()" style="background:var(--pink-light);">×</button>
+                    </div>
+                    <div class="toolbar">
+                        <button class="tool-btn" onclick="toggleEmoji()">😊</button>
+                        <button class="tool-btn" onclick="document.getElementById('imageInput').click()">🖼️</button>
+                        <button class="tool-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+                        <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(this)" style="display:none;">
+                        <input type="file" id="fileInput" onchange="handleFileSelect(this)" style="display:none;">
+                    </div>
+                    <div class="input-row">
+                        <input type="text" id="msgInput" placeholder="说点什么..." disabled>
+                        <button id="sendBtn" disabled onclick="send()">发 送</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 好友面板 ===== -->
+            <div class="panel" id="panel-friends">
+                <div class="friend-header">
+                    <input type="text" id="friendSearchInput" placeholder="搜索用户..." onkeydown="if(event.key==='Enter')searchUsers()">
+                    <button class="btn-sm" onclick="searchUsers()" style="background:var(--mint);">🔍</button>
+                </div>
+                <div class="friend-tabs">
+                    <div class="friend-tab active" data-ftab="list" onclick="switchFriendTab('list')">我的好友</div>
+                    <div class="friend-tab" data-ftab="requests" onclick="switchFriendTab('requests')">好友申请 <span id="reqBadge" style="color:#e74c3c;display:none;">(0)</span></div>
+                    <div class="friend-tab" data-ftab="search" onclick="switchFriendTab('search')">搜索</div>
+                </div>
+                <div class="friend-list" id="friendList"><div class="loading">加载中...</div></div>
+                <div class="friend-list" id="friendSearchResults" style="display:none;"></div>
+                <div class="friend-list" id="friendRequestsList" style="display:none;"></div>
+            </div>
+
+            <!-- ===== 社区面板 ===== -->
+            <div class="panel" id="panel-community">
+                <div class="community-header">
+                    <h3>📝 社区帖子</h3>
+                    <button class="btn-sm" onclick="showCreatePost()" style="background:var(--mint);">➕ 发帖</button>
+                </div>
+                <div class="community-list" id="postList"><div class="loading">加载中...</div></div>
+            </div>
+
+            <!-- ===== 设置面板 ===== -->
+            <div class="panel" id="panel-settings">
+                <div class="settings-panel">
+                    <h3>⚙️ 个人设置</h3>
+                    <div class="settings-group">
+                        <label>头像</label>
+                        <div class="avatar-upload-area">
+                            <div class="avatar-preview-large" id="avatarPreviewLarge"></div>
+                            <div>
+                                <button class="btn-sm" onclick="document.getElementById('avatarInput').click()" style="background:var(--mint);">📷 更换头像</button>
+                                <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(this)" style="display:none;">
+                                <div style="font-size:11px;color:#888;margin-top:4px;">支持 jpg/png/gif</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <label>用户名</label>
+                        <div style="font-size:16px;font-weight:700;" id="settingsUsername"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 帖子详情弹窗 -->
+    <div class="modal-overlay" id="postDetailModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span id="postDetailTitle">帖子详情</span>
+                <button class="modal-close" onclick="closePostDetail()">×</button>
+            </div>
+            <div class="modal-body" id="postDetailBody"></div>
+            <div class="modal-footer">
+                <input type="text" id="commentInput" placeholder="写评论..." onkeydown="if(event.key==='Enter')addComment()">
+                <button class="btn-sm" onclick="addComment()" style="background:var(--mint);">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 发帖弹窗 -->
+    <div class="modal-overlay" id="createPostModal">
+        <div class="modal-box">
+            <div class="modal-header"><span>📝 发布帖子</span><button class="modal-close" onclick="closeCreatePost()">×</button></div>
+            <div class="modal-body">
+                <input type="text" id="createPostTitle" placeholder="标题（必填）" style="width:100%;padding:10px 14px;border:var(--border);border-radius:8px;outline:none;font-size:14px;margin-bottom:10px;">
+                <textarea id="createPostContent" placeholder="内容（必填）" style="width:100%;padding:10px 14px;border:var(--border);border-radius:8px;outline:none;font-size:13px;min-height:150px;resize:vertical;font-family:inherit;"></textarea>
+                <button class="auth-btn-primary" onclick="createPost()" style="margin-top:10px;width:100%;">发 布</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 私聊弹窗 -->
+    <div class="private-chat-overlay" id="privateChatOverlay">
+        <div class="private-chat-box">
+            <div class="private-chat-header">
+                <span id="privateChatTitle">✉️ 私聊</span>
+                <button class="modal-close" onclick="closePrivateChat()">×</button>
+            </div>
+            <div class="private-chat-body" id="privateChatBody"></div>
+            <div class="private-chat-input">
+                <input type="text" id="privateChatInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendPrivateMsg()">
+                <button onclick="sendPrivateMsg()">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 私聊列表侧边栏 -->
+    <div class="chat-list-panel" id="chatListPanel">
+        <div class="chat-list-header"><span>✉️ 私聊列表</span><button class="btn-sm" onclick="toggleChatList()">✕</button></div>
+        <div class="chat-list-body" id="chatListBody"><div class="loading">加载中...</div></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== 全局变量 ====================
+        let ws = null, myUsername = '', myToken = '', currentChannel = 'general', replyTo = null;
+        let notifEnabled = false, reconnectTimer = null, currentPanel = 'chat', currentFTab = 'list';
+        let privateChatUser = null, currentPostId = null;
+        const MAX_MESSAGES = 200;
+
+        const EMOJIS = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😚','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️','🧡','💛','💚','💙','💜'];
+
+        function escapeHtml(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+        function formatFileSize(b) { return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB'; }
+        function showToast(m,t) { const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),t||2000); }
+
+        // ==================== 面板切换 ====================
+        function switchPanel(name) {
+            currentPanel = name;
+            document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+            document.querySelectorAll('.nav-item[data-panel]').forEach(n=>n.classList.remove('active'));
+            const panel = document.getElementById('panel-'+name);
+            if (panel) panel.classList.add('active');
+            document.querySelector('.nav-item[data-panel="'+name+'"]')?.classList.add('active');
+            if (name==='friends') loadFriendTab();
+            if (name==='community') loadPosts();
+            if (name==='settings') loadSettings();
+        }
+
+        // ==================== Emoji ====================
+        function initEmoji() {
+            const g=document.getElementById('emojiGrid'); g.innerHTML='';
+            EMOJIS.forEach(e=>{ const s=document.createElement('span'); s.className='emoji-item'; s.textContent=e; s.onclick=()=>{ document.getElementById('msgInput').value+=e; document.getElementById('msgInput').focus(); }; g.appendChild(s); });
+        }
+        function toggleEmoji() { document.getElementById('emojiPicker').classList.toggle('show'); }
+
+        // ==================== 认证 ====================
+        document.querySelectorAll('.auth-tab').forEach(t=>{ t.onclick=()=>{
+            document.querySelectorAll('.auth-tab').forEach(tt=>tt.classList.remove('active'));
+            t.classList.add('active');
+            document.getElementById('loginForm').style.display=t.dataset.tab==='login'?'block':'none';
+            document.getElementById('registerForm').style.display=t.dataset.tab==='login'?'none':'block';
+            document.getElementById('authError').style.display='none';
+        }});
+
+        function showAuthError(m) { const e=document.getElementById('authError'); e.textContent=m; e.style.display='block'; }
+
+        async function checkLoginStatus() {
+            try {
+                const r=await fetch('/api/check_login'); const d=await r.json();
+                if (d.code===200&&d.data.logged_in) { myUsername=d.data.username; myToken=d.data.token||localStorage.getItem('chat_token')||''; if(myToken)localStorage.setItem('chat_token',myToken); enterChat(); return true; }
+            } catch(e) {}
+            return false;
+        }
+
+        async function doLogin() {
+            const u=document.getElementById('loginUsername').value.trim(), p=document.getElementById('loginPassword').value;
+            if(!u||!p) { showAuthError('请填写用户名和密码'); return; }
+            try {
+                const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+                const d=await r.json();
+                if(d.code===200){ myUsername=d.data.username; myToken=d.data.token; localStorage.setItem('chat_token',myToken); enterChat(); }
+                else showAuthError(d.msg);
+            } catch(e) { showAuthError('网络错误'); }
+        }
+
+        async function doRegister() {
+            const u=document.getElementById('regUsername').value.trim(), n=document.getElementById('regNickname').value.trim()||u, p=document.getElementById('regPassword').value;
+            if(!u||!p) { showAuthError('请填写用户名和密码'); return; }
+            try {
+                const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,nickname:n,password:p})});
+                const d=await r.json();
+                if(d.code===200){ alert('注册成功！请登录'); document.querySelector('[data-tab="login"]').click(); document.getElementById('loginUsername').value=u; document.getElementById('loginPassword').focus(); }
+                else showAuthError(d.msg);
+            } catch(e) { showAuthError('网络错误'); }
+        }
+
+        function enterChat() {
+            document.getElementById('authLayer').style.display='none'; document.getElementById('appShell').classList.add('show');
+            const av=document.getElementById('userAvatar'); av.textContent=myUsername.charAt(0).toUpperCase(); av.title=myUsername;
+            document.getElementById('msgInput').disabled=false; document.getElementById('sendBtn').disabled=false;
+            initEmoji(); connectWs(); loadHistory(); loadChannels();
+        }
+
+        async function logout() { try{await fetch('/api/logout',{method:'POST'});}catch(e){} localStorage.removeItem('chat_token'); myToken=''; if(ws)ws.close(); location.reload(); }
+
+        // ==================== WebSocket ====================
+        function connectWs() {
+            if(ws)ws.close();
+            ws=new WebSocket(`ws://${location.host}/ws`);
+            ws.onopen=()=>{ ws.send(JSON.stringify({token:myToken})); document.getElementById('msgInput').focus(); };
+            ws.onmessage=(e)=>{
+                try {
+                    const d=JSON.parse(e.data);
+                    if(d.type==='kicked'){ alert(d.content||'已在别处登录'); if(ws)ws.close(); localStorage.removeItem('chat_token'); myToken=''; location.reload(); return; }
+                    if(d.type==='error'){ alert(d.content); logout(); return; }
+                    if(d.type==='channel_updated'){ loadChannels(); return; }
+                    if(d.online_count!==undefined) document.getElementById('onlineNum').textContent='👥 在线：'+d.online_count;
+
+                    const myMsg=d.username===myUsername;
+                    if(!myMsg&&(d.channel_id&&d.channel_id!==currentChannel||document.hidden)){
+                        if(['text','image','file','system'].includes(d.type)) showNotification(d.username,d.content,d.type);
+                        if(d.type==='private'&&d.sender!==myUsername) showNotification(d.sender,d.content,'private');
+                        if(d.type==='friend_request') showNotification(d.from_user,'好友申请','friend');
+                        if(d.type==='comment_notification') showNotification(d.author,'评论了帖子','comment');
+                    }
+
+                    if(d.type==='private'){ handlePrivateWs(d); return; }
+                    if(d.type==='friend_request'){ showToast(d.from_user+' 向你发送了好友申请'); updateFriendBadge(); if(currentPanel==='friends')loadFriendTab(); return; }
+                    if(d.type==='friend_accepted'){ showToast(d.from_user+' 已同意你的好友申请'); updateFriendBadge(); if(currentPanel==='friends')loadFriendTab(); return; }
+                    if(d.type==='friend_deleted'){ showToast(d.from_user+' 删除了好友关系'); if(currentPanel==='friends')loadFriendTab(); return; }
+                    if(d.type==='friend_status'){ if(currentPanel==='friends')loadFriendTab(); return; }
+                    if(d.type==='comment_notification'){ showToast(d.author+' 评论了「'+d.post_title+'」'); if(currentPanel==='community')loadPosts(); return; }
+
+                    if(d.channel_id&&d.channel_id!==currentChannel) return;
+                    if(['text','image','file','system'].includes(d.type)) showMsg(d);
+                } catch(err) {}
+            };
+            ws.onclose=()=>{ document.getElementById('msgInput').disabled=true; document.getElementById('sendBtn').disabled=true; reconnectTimer=setTimeout(connectWs,3000); };
+            ws.onerror=()=>{};
+        }
+
+        // ==================== 消息处理 ====================
+        function showMsg(data) {
+            const body=document.getElementById('chatBody'), div=document.createElement('div'), msgId=data.id||Date.now();
+            if(data.type==='system'){ div.className='msg'; div.innerHTML='<span class="system-msg">'+escapeHtml(data.content)+'</span>'; }
+            else {
+                const isMine=data.username===myUsername; div.className='msg user-item '+(isMine?'mine':'other'); div.dataset.msgId=msgId;
+                let replyHtml='';
+                if(data.reply_to&&data.reply_to.username) replyHtml='<div class="reply-quote" onclick="scrollToMsg(\''+data.reply_to.id+'\')">↩ 回复 '+escapeHtml(data.reply_to.username)+': '+escapeHtml((data.reply_to.content||'').substring(0,40))+'</div>';
+                let content='';
+                if(data.type==='image') content='<img class="msg-image" src="'+data.content+'" onclick="previewImage(\''+escapeHtml(data.content)+'\')" alt="图片">';
+                else if(data.type==='file'){ const fn=data.filename||data.content.split('/').pop(); content='<a class="msg-file" href="'+data.content+'" download="'+escapeHtml(fn)+'"><span class="file-icon">📄</span><span class="file-info"><span class="file-name">'+escapeHtml(fn)+'</span><span class="file-size">点击下载</span></span></a>'; }
+                else content=escapeHtml(data.content);
+                div.innerHTML='<div class="user-name">'+escapeHtml(data.username)+' · '+data.time+'</div>'+replyHtml+'<div class="user-bubble">'+content+'<button class="reply-btn" onclick="event.stopPropagation();startReply('+msgId+',\''+escapeHtml(data.username)+'\',\''+escapeHtml((data.content||'').substring(0,60))+'\')" title="回复">↩</button></div>';
+            }
+            body.appendChild(div);
+            while(body.children.length>MAX_MESSAGES) body.removeChild(body.firstChild);
+            body.scrollTop=body.scrollHeight;
+        }
+
+        function send() {
+            const c=document.getElementById('msgInput').value.trim();
+            if(!c||!ws||ws.readyState!==WebSocket.OPEN) return;
+            const m={type:'text',content:c,channel_id:currentChannel}; if(replyTo){ m.reply_to=replyTo; cancelReply(); }
+            ws.send(JSON.stringify(m)); document.getElementById('msgInput').value=''; document.getElementById('msgInput').focus();
+        }
+
+        function startReply(id,username,content) { replyTo={id,username,content}; document.getElementById('replyBar').style.display='flex'; document.getElementById('replyText').textContent='回复 '+username+': '+content; }
+        function cancelReply() { replyTo=null; document.getElementById('replyBar').style.display='none'; }
+        function scrollToMsg(id) { const el=document.querySelector('[data-msg-id="'+id+'"]'); if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.background='#FFF5BA'; setTimeout(()=>el.style.background='',2000); } }
+
+        // ==================== 通知 ====================
+        function requestNotification() {
+            if(!('Notification' in window)){ showToast('浏览器不支持通知'); return; }
+            Notification.requestPermission().then(p=>{ notifEnabled=p==='granted'; showToast(notifEnabled?'✅ 通知已开启':'❌ 通知被拒绝'); });
+        }
+        function showNotification(title,body,type) {
+            if(!notifEnabled||document.hasFocus()) return;
+            if(Notification.permission!=='granted') return;
+            const i=type==='private'?'✉️':type==='friend'?'👥':type==='comment'?'💬':'💬';
+            try{ new Notification(i+' '+title,{body:body.substring(0,100),icon:'/favicon.ico'}); }catch(e){}
+        }
+
+        // ==================== 频道 ====================
+        async function loadChannels() {
+            try {
+                const r=await fetch('/api/channels'); const d=await r.json();
+                if(d.code!==200) return;
+                document.getElementById('channelSelect').innerHTML=(d.data||[]).map(c=>'<option value="'+c.name+'" '+(c.name===currentChannel?'selected':'')+'># '+escapeHtml(c.name)+'</option>').join('');
+            } catch(e) {}
+        }
+        function switchChannel() { currentChannel=document.getElementById('channelSelect').value; loadHistory(); replyTo=null; cancelReply(); }
+        async function createChannel() {
+            const n=prompt('输入新频道名（1-20位）:'); if(!n||!n.trim()) return;
+            try {
+                const r=await fetch('/api/channel/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n.trim(),description:''})});
+                const d=await r.json();
+                if(d.code===200){ showToast('频道创建成功！'); loadChannels(); document.getElementById('channelSelect').value=n; currentChannel=n; loadHistory(); }
+                else showToast(d.msg||'创建失败');
+            } catch(e) { showToast('网络错误'); }
+        }
+        async function deleteChannel() {
+            if(currentChannel==='大厅'){ showToast('不能删除默认频道'); return; }
+            if(!confirm('确定删除频道 #'+currentChannel+'？')) return;
+            try {
+                const r=await fetch('/api/channel/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:currentChannel})});
+                const d=await r.json();
+                if(d.code===200){ currentChannel='大厅'; loadChannels(); loadHistory(); showToast('频道已删除'); }
+                else showToast(d.msg);
+            } catch(e) { showToast('网络错误'); }
+        }
+
+        // ==================== 文件上传 ====================
+        async function handleImageSelect(i) { if(i.files[0]){ await uploadFile(i.files[0],true); i.value=''; } }
+        async function handleFileSelect(i) { if(i.files[0]){ await uploadFile(i.files[0],false); i.value=''; } }
+
+        async function uploadFile(file,isImage) {
+            if(!ws||ws.readyState!==WebSocket.OPEN){ alert('请先登录'); return; }
+            showUploadPreview(file,isImage);
+            const fd=new FormData(); fd.append('file',file);
+            try {
+                const r=await fetch('/api/upload',{method:'POST',body:fd}); const d=await r.json();
+                hideUploadPreview();
+                if(d.code===200) ws.send(JSON.stringify({type:d.data.type,content:d.data.url,filename:d.data.filename}));
+                else alert(d.msg||'上传失败');
+            } catch(e) { hideUploadPreview(); alert('上传失败'); }
+        }
+
+        function showUploadPreview(f,isI) {
+            const p=document.getElementById('uploadPreview'), t=document.getElementById('previewThumb'), ic=document.getElementById('previewFileIcon');
+            document.getElementById('uploadName').textContent=f.name; document.getElementById('uploadSize').textContent=formatFileSize(f.size);
+            if(isI){ t.src=URL.createObjectURL(f); t.style.display='block'; ic.style.display='none'; }
+            else { t.style.display='none'; ic.style.display='flex'; }
+            p.classList.add('show');
+        }
+        function hideUploadPreview() { document.getElementById('uploadPreview').classList.remove('show'); }
+        function cancelUpload() { hideUploadPreview(); }
+
+        // ==================== 图片预览 ====================
+        function previewImage(src) { document.getElementById('previewImg').src=src; document.getElementById('imagePreview').classList.add('show'); }
+        function closeImagePreview() { document.getElementById('imagePreview').classList.remove('show'); }
+
+        // ==================== 历史记录 ====================
+        async function loadHistory() {
+            const b=document.getElementById('chatBody'); b.innerHTML='<div class="loading">加载历史记录中</div>';
+            try {
+                const r=await fetch('/api/history?limit=50&channel='+encodeURIComponent(currentChannel));
+                const d=await r.json(); b.innerHTML='';
+                if(d.code===200&&d.data.length>0) {
+                    d.data.forEach(m=>showMsg({id:m.id,type:m.type,username:m.username,content:m.content,filename:m.filename,time:m.time,reply_to:m.reply_to_id?{id:m.reply_to_id,content:m.reply_to_content,username:m.reply_to_username}:null}));
+                } else b.innerHTML='<div class="loading">暂无历史记录，来发第一条消息吧~</div>';
+            } catch(e) { b.innerHTML='<div class="loading">加载失败</div>'; }
+        }
+
+        // ==================== 私聊 ====================
+        function toggleChatList() {
+            document.getElementById('chatListPanel').classList.toggle('show');
+            if(document.getElementById('chatListPanel').classList.contains('show')) loadChatList();
+        }
+        async function loadChatList() {
+            try {
+                const r=await fetch('/api/private/chats'); const d=await r.json();
+                const b=document.getElementById('chatListBody');
+                if(d.code!==200||!d.data.length){ b.innerHTML='<div class="loading">暂无聊天记录</div>'; return; }
+                b.innerHTML=d.data.map(c=>`
+                    <div class="chat-list-item" onclick="openPrivateChat('${escapeHtml(c.username)}','${escapeHtml(c.nickname)}')">
+                        <div class="chat-list-avatar">${escapeHtml(c.nickname||c.username).charAt(0).toUpperCase()}</div>
+                        <div class="chat-list-info"><div class="chat-list-name">${escapeHtml(c.nickname||c.username)}</div><div class="chat-list-msg">${escapeHtml((c.last_msg||'').substring(0,30))}</div></div>
+                        ${c.unread>0?'<span class="unread-count">'+c.unread+'</span>':''}
+                    </div>`).join('');
+            } catch(e) {}
+        }
+
+        function openPrivateChat(username,nickname='') {
+            privateChatUser=username; document.getElementById('privateChatOverlay').classList.add('show');
+            document.getElementById('privateChatTitle').textContent='✉️ 与 '+(nickname||username)+' 聊天';
+            loadPrivateHistory(); document.getElementById('chatListPanel').classList.remove('show');
+        }
+        function closePrivateChat() { privateChatUser=null; document.getElementById('privateChatOverlay').classList.remove('show'); }
+
+        async function loadPrivateHistory() {
+            if(!privateChatUser) return;
+            try {
+                const r=await fetch('/api/private/history?user='+encodeURIComponent(privateChatUser));
+                const d=await r.json(); const b=document.getElementById('privateChatBody'); b.innerHTML='';
+                if(d.code===200&&d.data.length>0){
+                    d.data.forEach(m=>{
+                        const isMine=m.sender===myUsername;
+                        b.innerHTML+='<div class="private-msg '+(isMine?'mine':'other')+'"><div class="meta">'+escapeHtml(m.sender)+' · '+m.time+'</div><div class="bubble">'+escapeHtml(m.content)+'</div></div>';
+                    });
+                } else b.innerHTML='<div class="loading">暂无消息</div>';
+                b.scrollTop=b.scrollHeight;
+            } catch(e) {}
+        }
+
+        function handlePrivateWs(data) {
+            if(privateChatUser&&(data.sender===privateChatUser||data.receiver===privateChatUser)) {
+                const isMine=data.sender===myUsername;
+                document.getElementById('privateChatBody').innerHTML+='<div class="private-msg '+(isMine?'mine':'other')+'"><div class="meta">'+escapeHtml(data.sender)+' · '+data.time+'</div><div class="bubble">'+escapeHtml(data.content)+'</div></div>';
+                document.getElementById('privateChatBody').scrollTop=document.getElementById('privateChatBody').scrollHeight;
+            }
+        }
+
+        async function sendPrivateMsg() {
+            const c=document.getElementById('privateChatInput').value.trim();
+            if(!c||!privateChatUser) return;
+            try {
+                await fetch('/api/private/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({receiver:privateChatUser,content:c})});
+                document.getElementById('privateChatInput').value=''; loadPrivateHistory();
+            } catch(e) {}
+        }
+
+        // ==================== 好友 ====================
+        function switchFriendTab(tab) {
+            currentFTab=tab;
+            document.querySelectorAll('.friend-tab').forEach(t=>t.classList.remove('active'));
+            document.querySelector('[data-ftab="'+tab+'"]').classList.add('active');
+            document.getElementById('friendList').style.display=tab==='list'?'block':'none';
+            document.getElementById('friendSearchResults').style.display=tab==='search'?'block':'none';
+            document.getElementById('friendRequestsList').style.display=tab==='requests'?'block':'none';
+            if(tab==='list') loadFriendList();
+            else if(tab==='requests') loadFriendRequests();
+            else if(tab==='search') document.getElementById('friendSearchInput').focus();
+        }
+
+        async function loadFriendTab() {
+            if(currentFTab==='list') loadFriendList();
+            else if(currentFTab==='requests') loadFriendRequests();
+        }
+
+        async function loadFriendList() {
+            try {
+                const r=await fetch('/api/friend/list'); const d=await r.json();
+                const b=document.getElementById('friendList');
+                if(d.code!==200||!d.data.length){ b.innerHTML='<div class="loading">暂无好友，去搜索添加吧~</div>'; return; }
+                b.innerHTML=d.data.map(f=>`
+                    <div class="friend-item">
+                        <div class="friend-avatar" onclick="openPrivateChat('${escapeHtml(f.username)}','${escapeHtml(f.nickname)}')">${(f.nickname||f.username).charAt(0).toUpperCase()}<span class="online-dot ${f.online?'':'offline-dot'}"></span></div>
+                        <div class="friend-info">
+                            <div class="friend-name">${escapeHtml(f.nickname||f.username)}</div>
+                            <div class="friend-status">${f.online?'在线':f.last_online||'离线'}</div>
+                        </div>
+                        <div class="friend-actions">
+                            <button onclick="event.stopPropagation();openPrivateChat('${escapeHtml(f.username)}','${escapeHtml(f.nickname)}')">💬</button>
+                            <button class="danger" onclick="event.stopPropagation();deleteFriend('${escapeHtml(f.username)}')">删除</button>
+                        </div>
+                    </div>`).join('');
+            } catch(e) {}
+        }
+
+        async function searchUsers() {
+            const kw=document.getElementById('friendSearchInput').value.trim();
+            if(!kw){ showToast('请输入搜索关键词'); return; }
+            try {
+                const r=await fetch('/api/friend/search?keyword='+encodeURIComponent(kw)); const d=await r.json();
+                const b=document.getElementById('friendSearchResults');
+                if(d.code!==200||!d.data.length){ b.innerHTML='<div class="loading">未找到用户</div>'; return; }
+                b.innerHTML=d.data.map(u=>`
+                    <div class="friend-item">
+                        <div class="friend-avatar">${(u.nickname||u.username).charAt(0).toUpperCase()}<span class="online-dot ${u.online?'':'offline-dot'}"></span></div>
+                        <div class="friend-info"><div class="friend-name">${escapeHtml(u.nickname||u.username)}</div><div class="friend-status">${u.online?'在线':u.last_online||''}</div></div>
+                        <div class="friend-actions">
+                            ${u.is_friend?'<span style="font-size:11px;color:#888;">已是好友</span>':'<button onclick="sendFriendReq(\''+escapeHtml(u.username)+'\')">添加好友</button>'}
+                        </div>
+                    </div>`).join('');
+            } catch(e) {}
+        }
+
+        async function sendFriendReq(touser) {
+            try {
+                const r=await fetch('/api/friend/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to_user:touser,message:'你好，我想加你为好友'})});
+                const d=await r.json(); showToast(d.msg);
+            } catch(e) { showToast('网络错误'); }
+        }
+
+        async function loadFriendRequests() {
+            try {
+                const r=await fetch('/api/friend/requests'); const d=await r.json();
+                const b=document.getElementById('friendRequestsList');
+                if(d.code!==200||!d.data.length){ b.innerHTML='<div class="loading">暂无好友申请</div>'; return; }
+                const received=d.data.filter(r=>r.to_user===myUsername&&r.status==='pending');
+                b.innerHTML=received.map(rr=>`
+                    <div class="request-item">
+                        <div class="friend-avatar">${(rr.nickname||rr.from_user).charAt(0).toUpperCase()}</div>
+                        <div><b>${escapeHtml(rr.nickname||rr.from_user)}</b><br><small>${escapeHtml(rr.message||'')}</small></div>
+                        <div class="request-actions">
+                            <button class="btn-accept" onclick="acceptFriendReq(${rr.id})">接受</button>
+                            <button class="btn-reject" onclick="rejectFriendReq(${rr.id})">拒绝</button>
+                        </div>
+                    </div>`).join('');
+            } catch(e) {}
+        }
+
+        async function acceptFriendReq(id) {
+            try {
+                const r=await fetch('/api/friend/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:id})});
+                const d=await r.json(); showToast(d.msg); loadFriendRequests(); loadFriendList();
+            } catch(e) {}
+        }
+
+        async function rejectFriendReq(id) {
+            try {
+                await fetch('/api/friend/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request_id:id})});
+                showToast('已拒绝'); loadFriendRequests();
+            } catch(e) {}
+        }
+
+        async function deleteFriend(friend) {
+            if(!confirm('确定删除好友 '+friend+'？')) return;
+            try {
+                await fetch('/api/friend/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({friend})});
+                showToast('好友已删除'); loadFriendList();
+            } catch(e) {}
+        }
+
+        async function updateFriendBadge() {
+            try {
+                const r=await fetch('/api/friend/request_count'); const d=await r.json();
+                const b=document.getElementById('friendBadge');
+                if(d.code===200&&d.data.count>0){ b.textContent=d.data.count; b.classList.add('show'); }
+                else b.classList.remove('show');
+                const rb=document.getElementById('reqBadge');
+                if(d.code===200&&d.data.count>0){ rb.textContent='('+d.data.count+')'; rb.style.display='inline'; }
+                else rb.style.display='none';
+            } catch(e) {}
+        }
+
+        // ==================== 社区帖子 ====================
+        function showCreatePost() {
+            document.getElementById('createPostModal').classList.add('show');
+            document.getElementById('createPostTitle').focus();
+        }
+        function closeCreatePost() { document.getElementById('createPostModal').classList.remove('show'); }
+
+        async function createPost() {
+            const t=document.getElementById('createPostTitle').value.trim(), c=document.getElementById('createPostContent').value.trim();
+            if(!t||!c){ showToast('标题和内容不能为空'); return; }
+            try {
+                const r=await fetch('/api/post/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t,content:c})});
+                const d=await r.json();
+                if(d.code===200){ showToast('发布成功！'); closeCreatePost(); document.getElementById('createPostTitle').value=''; document.getElementById('createPostContent').value=''; loadPosts(); }
+                else showToast(d.msg);
+            } catch(e) { showToast('网络错误'); }
+        }
+
+        async function loadPosts() {
+            const b=document.getElementById('postList'); b.innerHTML='<div class="loading">加载中...</div>';
+            try {
+                const r=await fetch('/api/posts'); const d=await r.json();
+                if(d.code!==200||!d.data.length){ b.innerHTML='<div class="loading">暂无帖子，快去发帖吧~</div>'; return; }
+                b.innerHTML=d.data.map(p=>`
+                    <div class="post-card" onclick="openPostDetail(${p.id})">
+                        <div class="post-title">${escapeHtml(p.title)}</div>
+                        <div class="post-meta"><span>👤 ${escapeHtml(p.author)}</span><span>🕒 ${p.time}</span></div>
+                        <div class="post-content">${escapeHtml(p.content.substring(0,100))}${p.content.length>100?'...':''}</div>
+                        <div class="post-stats">
+                            <span onclick="event.stopPropagation();toggleLike(${p.id})" class="${p.liked?'liked':''}">${p.liked?'❤️':'🤍'} ${p.likes}</span>
+                            <span>💬 ${p.comment_count}</span>
+                        </div>
+                    </div>`).join('');
+            } catch(e) { b.innerHTML='<div class="loading">加载失败</div>'; }
+        }
+
+        async function toggleLike(pid) {
+            try {
+                const r=await fetch('/api/post/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({post_id:pid})});
+                const d=await r.json(); loadPosts();
+            } catch(e) {}
+        }
+
+        async function openPostDetail(pid) {
+            currentPostId=pid;
+            try {
+                const r=await fetch('/api/post/detail?id='+pid); const d=await r.json();
+                if(d.code!==200) return;
+                const p=d.data.post, cs=d.data.comments;
+                document.getElementById('postDetailTitle').textContent=p.title;
+                document.getElementById('postDetailBody').innerHTML=`
+                    <div class="post-full-content">${escapeHtml(p.content)}</div>
+                    <div class="post-meta"><span>👤 ${escapeHtml(p.author)}</span><span>🕒 ${p.time}</span><span onclick="toggleLike(${p.id});event.stopPropagation();" style="cursor:pointer;">${p.liked?'❤️':'🤍'} ${p.likes}</span><span>💬 ${cs.length} 条评论</span></div>
+                    <hr style="margin:12px 0;border:none;border-top:1px solid #eee;">
+                    ${cs.length?cs.map(c=>'<div class="comment-item"><div class="comment-author">'+escapeHtml(c.author)+' <span class="comment-time">'+c.time+'</span></div><div class="comment-content">'+escapeHtml(c.content)+'</div></div>').join(''):'<div class="loading">暂无评论</div>'}
+                `;
+                document.getElementById('postDetailModal').classList.add('show');
+            } catch(e) {}
+        }
+        function closePostDetail() { currentPostId=null; document.getElementById('postDetailModal').classList.remove('show'); }
+
+        async function addComment() {
+            const c=document.getElementById('commentInput').value.trim();
+            if(!c||!currentPostId) return;
+            try {
+                const r=await fetch('/api/comment/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({post_id:currentPostId,content:c})});
+                const d=await r.json();
+                if(d.code===200){ document.getElementById('commentInput').value=''; openPostDetail(currentPostId); }
+                else showToast(d.msg);
+            } catch(e) {}
+        }
+
+        // ==================== 头像上传 ====================
+        async function uploadAvatar(input) {
+            if(!input.files[0]) return;
+            const fd=new FormData(); fd.append('file',input.files[0]);
+            try {
+                const r=await fetch('/api/upload',{method:'POST',body:fd}); const d=await r.json();
+                if(d.code===200) {
+                    // Update avatar preview
+                    const url=d.data.url;
+                    document.getElementById('avatarPreviewLarge').innerHTML='<img src="'+url+'" alt="头像">';
+                    document.getElementById('userAvatar').innerHTML='<img src="'+url+'" alt="" style="width:100%;height:100%;border-radius:6px;object-fit:cover;">';
+                    showToast('头像上传成功！');
+                } else showToast(d.msg||'上传失败');
+            } catch(e) { showToast('网络错误'); }
+            input.value='';
+        }
+
+        function loadSettings() {
+            document.getElementById('settingsUsername').textContent=myUsername;
+            const av=document.getElementById('avatarPreviewLarge');
+            const html=document.getElementById('userAvatar').innerHTML;
+            av.innerHTML=html||myUsername.charAt(0).toUpperCase();
+        }
+
+        // ==================== 事件绑定 ====================
+        document.getElementById('sendBtn').onclick=send;
+        document.getElementById('msgInput').onkeydown=(e)=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } };
+        document.addEventListener('click',(e)=>{ if(!e.target.closest('.emoji-picker')&&!e.target.closest('.tool-btn')) document.getElementById('emojiPicker').classList.remove('show'); });
+        document.getElementById('imagePreview').onclick=(e)=>{ if(e.target.id==='imagePreview') closeImagePreview(); };
+        document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeImagePreview(); document.getElementById('emojiPicker').classList.remove('show'); } });
+        window.onbeforeunload=()=>{ if(reconnectTimer)clearTimeout(reconnectTimer); if(ws)ws.close(); };
+
+        // 启动
+        checkLoginStatus().then(loggedIn=>{ if(loggedIn) updateFriendBadge(); });
+    </script>
+</body>
+</html>
